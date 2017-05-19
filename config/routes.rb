@@ -42,11 +42,16 @@ devise_for :users,
     resources :lessons, only: [:show]
   end
   resources :lessons, only: [:show] do
-    resources :projects, only: [:create, :update, :destroy]
+    resources :projects, only: [:create, :update, :destroy] do
+      resources :votes, only: [:index, :create]
+      delete 'vote', to: 'projects/votes#destroy', as: 'lesson_projects_vote'
+    end
 
     get 'all_submissions', to: 'projects#all_submissions'
     get 'recent_submissions', to: 'projects#recent_submissions'
   end
+
+
 
   post 'lesson_completions' => 'lesson_completions#create'
   delete 'lesson_completions/:lesson_id' => 'lesson_completions#destroy', :as => 'lesson_completion'
