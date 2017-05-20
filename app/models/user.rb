@@ -9,10 +9,11 @@ class User < ApplicationRecord
   has_many :lesson_completions, foreign_key: :student_id
   has_many :completed_lessons, through: :lesson_completions, source: :lesson
   has_many :projects
+  acts_as_voter
 
   def format_completion_date
     if learning_goal_completion_date
-      learning_goal_completion_date.strftime('%B %Y')  
+      learning_goal_completion_date.strftime('%B %Y')
     else
       'Click here to set a date!'
     end

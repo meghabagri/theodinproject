@@ -1,24 +1,19 @@
 class VotesController < ApplicationController
-
-  def index
-    render json: project_vote_count
-  end
+  skip_before_action :verify_authenticity_token
 
   def create
     project.liked_by(current_user)
+    render json: project.votes_for.count
   end
 
-  def destory
+  def destroy
     project.unliked_by current_user
+    render json: project.votes_for.count
   end
 
   private
 
   def project
     Project.find(params[:project_id])
-  end
-
-  def project_vote_count
-    project.votes_for.size
   end
 end

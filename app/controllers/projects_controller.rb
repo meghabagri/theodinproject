@@ -1,14 +1,15 @@
 class ProjectsController < ApplicationController
-  before_action :authenticate_request, except: [:all_submissions]
+  before_action :authenticate_request, except: [:index]
   before_action :find_lesson
   before_action :find_project, only: [:update, :destroy]
-
   authorize_resource only: [:update, :destroy]
+
+  def index
+    @projects = decorated_projects
+  end
 
   def create
     @project = new_project(project_params)
-    @project.save
-    set_recent_submissions
   end
 
   def update
@@ -21,12 +22,11 @@ class ProjectsController < ApplicationController
     set_recent_submissions
   end
 
-  def all_submissions
-    submissions = Project.all_submissions(@lesson.id)
-    render json: submissions
-  end
-
   private
+
+  def decorated_projects
+    projects.map { |project| ProjectDecorator.new(project) }
+  end
 
   def set_recent_submissions
     @submissions = Project.all_submissions(@lesson.id).limit(10)
@@ -34,6 +34,10 @@ class ProjectsController < ApplicationController
 
   def find_project
     @project = Project.find(params[:id])
+  end
+
+  def projects
+    Project.all_submissions(@lesson.id)
   end
 
   def new_project(params)

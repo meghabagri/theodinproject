@@ -1,0 +1,10 @@
+<% if @projects.any? %>
+  <% @projects.each do |project| %>
+    <div class="card-main">
+      <%= render 'vote_buttons', votes: project.number_of_votes %>
+      <%= project.repo_url %>
+      <%= project.live_preview %>
+      <%= project.owner %>
+    </div>
+  <% end %>
+<% end %>

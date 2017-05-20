@@ -1,7 +1,6 @@
 require 'rails_helper'
 
 RSpec.describe ProjectsController, type: :controller do
-  let(:student) { double('Student', id: '1', admin?: false) }
   let(:admin) { double('Admin', id: '2', admin?: true) }
   let(:lesson) { double('Lesson', slug: 'building-blocks', id: '1') }
 
@@ -35,8 +34,11 @@ RSpec.describe ProjectsController, type: :controller do
     }
   }
 
-  def stub_current_user(user)
-    allow(controller).to receive(:current_user).and_return(student)
+  # safe
+  let(:user) { double('Student', id: '1', admin?: false) }
+
+  before do
+    allow(controller).to receive(:current_user).and_return(user)
   end
 
   def stub_lesson
@@ -71,33 +73,67 @@ RSpec.describe ProjectsController, type: :controller do
     allow(projects).to receive(:limit).with(10).and_return(projects)
   end
 
-  describe 'POST #create' do
-    subject { post :create, params: valid_params, xhr: true }
+  describe 'GET #index' do
+    let(:projects) { [project] }
+    let(:project) { double('Project') }
+    let(:decorated_project) { double('ProjectDecorator') }
+    let(:decorated_projects) { [decorated_project] }
+    let(:lesson) { double('Lesson', id: '1') }
 
-    context 'unauthenticated' do
-      it_behaves_like 'unauthenticated request'
+    before do
+      allow(Lesson).to receive_message_chain(:friendly, :find).with('1').
+        and_return(lesson)
+      allow(Project).to receive(:all_submissions).with('1').
+        and_return(projects)
+
+      allow(ProjectDecorator).to receive(:new).with(project).
+        and_return(decorated_project)
     end
 
-    context 'authenticated' do
+    it 'renders the projects index page' do
+      get :index, params: { lesson_id: '1' }
+      expect(response).to render_template(:index)
+    end
+
+    it 'assigns @projects' do
+      get :index, params: { lesson_id: '1' }
+      expect(assigns(:projects)).to eql(decorated_projects)
+    end
+  end
+
+  describe 'POST #create' do
+
+    context 'when user is not signed in' do
+
       before do
-        stub_current_user(student)
-        stub_lesson
-        stub_new_project_method(lesson.id)
-        stub_recent_submissions
+        allow(controller).to receive(:user_signed_in?).and_return(false)
       end
 
-      context 'valid values' do
-        before { allow(student_project).to receive(:save).and_return(true) }
-
-        it 'assigns recent submissions' do
-          subject
-          expect(assigns(:submissions)).to eq(projects)
-        end
-
-        it 'renders the create template' do
-          expect(subject).to render_template(:create)
-        end
+      it 'returns unauthorized ' do
+        post :create, params: valid_params, xhr: true
+        expect(response.status).to eql(401)
       end
+    end
+
+    context 'when user is signed in' do
+
+      before do
+        allow(controller).to receive(:user_signed_in?).and_return(true)
+      end
+
+      # context 'valid values' do
+      #   before { allow(student_project).to receive(:save).and_return(true) }
+      #
+      #   it 'assigns recent submissions' do
+      #     post :create, params: valid_params, xhr: true
+      #     expect(assigns(:submissions)).to eq(projects)
+      #   end
+      #
+      #   it 'renders the create template' do
+      #     post :create, params: valid_params, xhr: true
+      #     expect(response).to render_template(:create)
+      #   end
+      # end
 
       context 'invalid values' do
         subject { post :create, params: invalid_params, xhr: true }
@@ -127,7 +163,6 @@ RSpec.describe ProjectsController, type: :controller do
       context 'standard user' do
         describe 'can update his/her project' do
           before do
-            stub_current_user(student)
             stub_lesson
             stub_project(student_project.id, student_project)
             stub_authorize(:update, student_project)
@@ -155,14 +190,13 @@ RSpec.describe ProjectsController, type: :controller do
           end
         end
 
-        describe 'cannot update other user\'s project' do
+        describe 'cannot update other users project' do
           let(:request) {
             patch :update, params: valid_params.merge(id: admin_user_project.id),
               xhr: true
           }
 
           before do
-            stub_current_user(student)
             stub_lesson
             stub_project(admin_user_project.id, admin_user_project)
             stub_authorize_to_raise(:update, admin_user_project)
@@ -181,7 +215,6 @@ RSpec.describe ProjectsController, type: :controller do
           }
 
           before do
-            stub_current_user(admin)
             stub_lesson
             stub_project(admin_user_project.id, admin_user_project)
             stub_authorize(:update, admin_user_project)
@@ -209,14 +242,13 @@ RSpec.describe ProjectsController, type: :controller do
           end
         end
 
-        describe 'can update other user\'s project' do
+        describe 'can update other users project' do
           let(:request) {
             patch :update, params: valid_params.merge(id: student_project.id),
               xhr: true
           }
 
           before do
-            stub_current_user(admin)
             stub_lesson
             stub_project(student_project.id, student_project)
             allow(controller).to receive(:authorize!)
@@ -263,7 +295,6 @@ RSpec.describe ProjectsController, type: :controller do
       context 'standard user' do
         context 'can destroy his/her project' do
           before do
-            stub_current_user(student)
             stub_lesson
             stub_project(student_project.id, student_project)
             stub_authorize(:destroy, student_project)
@@ -282,7 +313,7 @@ RSpec.describe ProjectsController, type: :controller do
           end
         end
 
-        context 'cannot destroy other user\'s project' do
+        context 'cannot destroy other users project' do
           let(:request) {
             delete :destroy, params: {
               lesson_id: lesson.slug, id: admin_user_project.id
@@ -290,7 +321,6 @@ RSpec.describe ProjectsController, type: :controller do
           }
 
           before do
-            stub_current_user(student)
             stub_lesson
             stub_project(admin_user_project.id, admin_user_project)
             stub_authorize_to_raise(:destroy, admin_user_project)
@@ -309,7 +339,6 @@ RSpec.describe ProjectsController, type: :controller do
           }
 
           before do
-            stub_current_user(admin)
             stub_lesson
             stub_project(admin_user_project.id, admin_user_project)
             stub_authorize(:destroy, admin_user_project)
@@ -328,11 +357,10 @@ RSpec.describe ProjectsController, type: :controller do
           end
         end
 
-        describe 'can destroy other user\'s project' do
+        describe 'can destroy other users project' do
           let(:request) { subject }
 
           before do
-            stub_current_user(admin)
             stub_lesson
             stub_project(student_project.id, student_project)
             stub_authorize(:destroy, student_project)
@@ -351,28 +379,6 @@ RSpec.describe ProjectsController, type: :controller do
           end
         end
       end
-    end
-  end
-
-  describe 'GET #all_submissions' do
-    subject {
-      get :all_submissions, params: { lesson_id: valid_params[:lesson_id] }
-    }
-
-    before do
-      stub_lesson
-      allow(Project).to receive(:all_submissions).with(lesson.id)
-        .and_return(projects)
-    end
-
-    it 'calls the .all_submissions method' do
-      expect(Project).to receive(:all_submissions).with(lesson.id)
-      subject
-    end
-
-    it 'renders json' do
-      subject
-      expect(response.content_type).to eq('application/json')
     end
   end
 end
